@@ -1,0 +1,6 @@
+Django>=4.2
+djangorestframework
+transformers>=4.30.0
+torch
+requests
+python-dotenv
