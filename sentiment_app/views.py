@@ -73,7 +73,7 @@ def analyze_audio_file(request: HttpRequest):
             temp_file_path = temp_file.name
 
         # Process audio → transcription, translation, sentiment, summary
-        result = pipeline_service.process_audio(temp_file_path)
+        result = pipeline_service.process_call(temp_file_path)
 
         # Cleanup
         os.remove(temp_file_path)

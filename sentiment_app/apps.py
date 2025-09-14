@@ -6,4 +6,4 @@ class SentimentAppConfig(AppConfig):
 
     def ready(self):
         from .service import sentiment_service
-        sentiment_service.initialize_sentiment()
+        sentiment_service.initialize_sentiment_service()

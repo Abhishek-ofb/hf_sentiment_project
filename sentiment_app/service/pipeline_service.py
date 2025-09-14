@@ -1,35 +1,52 @@
+import subprocess
+import os
 from . import asr_service, translation_service, sentiment_service, summarization_service
 
+def convert_to_wav(input_path: str, output_path: str):
+    """
+    Converts any audio file to mono 16kHz WAV using ffmpeg.
+    """
+    command = [
+        "ffmpeg",
+        "-y",                # overwrite output
+        "-i", input_path,    # input file
+        "-ac", "1",          # mono
+        "-ar", "16000",      # 16kHz
+        output_path
+    ]
+    subprocess.run(command, check=True)
 
-def process_audio(audio_path: str) -> dict:
-    """Full pipeline for audio input"""
-    # Step 1: Transcribe Hindi/Hinglish
-    transcribed = asr_service.transcribe(audio_path)
+    
+def process_call(audio_path: str) -> dict:
+    try:
+        wav_path = audio_path.rsplit(".", 1)[0] + "_converted.wav"
+        convert_to_wav(audio_path, wav_path)
 
-    # Step 2: Translate Hinglish → English
-    english_text = translation_service.translate_to_english(transcribed)
-    print(f"Translated Text: {english_text}")
-    # Step 3: Run Sentiment + Summary in parallel (could use threads if needed)
-    sentiment = sentiment_service.analyze_sentiment(english_text)
-    summary = summarization_service.summarize_call(english_text)
+        asr_result = asr_service.transcribe_audio(wav_path)
+        english_text = asr_result.get("translated_text", "").strip()
 
-    return {
-        "transcribed_text": transcribed,
-        "translated_text": english_text,
-        "sentiment": sentiment,
-        "summary": summary
-    }
+        if not english_text or len(english_text) < 5:
+            return {
+                "transcribed_text": asr_result.get("transcribed_text", ""),
+                "translated_text": "",
+                "sentiment": {"label": "unknown", "score": 0.0},
+                "summary": "⚠️ No valid transcription available"
+            }
 
+        sentiment = sentiment_service.analyze_sentiment(english_text)
+        summary = summarization_service.summarize_call(english_text)
 
-def process_text(text: str) -> dict:
-    """Pipeline for raw text input"""
-    english_text = translation_service.translate_to_english(text)
-    sentiment = sentiment_service.analyze_sentiment(english_text)
-    summary = summarization_service.summarize_call(english_text)
-
-    return {
-        "input_text": text,
-        "translated_text": english_text,
-        "sentiment": sentiment,
-        "summary": summary
-    }
+        return {
+            "transcribed_text": asr_result["transcribed_text"],
+            "translated_text": english_text,
+            "sentiment": sentiment,
+            "summary": summary
+        }
+    except Exception as e:
+        print("process_call failed:", e)
+        return {
+            "transcribed_text": "",
+            "translated_text": "",
+            "sentiment": {"label": "unknown", "score": 0.0},
+            "summary": f"❌ Processing failed: {e}"
+        }

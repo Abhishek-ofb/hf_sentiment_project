@@ -1,4 +1,5 @@
 import os, threading
+from . import translation_service
 from transformers import pipeline
 
 ASR_MODEL_NAME = os.getenv("ASR_MODEL", "Oriserve/Whisper-Hindi2Hinglish-Swift")
@@ -16,20 +17,40 @@ def initialize_asr():
                 _asr_pipeline = pipeline("automatic-speech-recognition", model=ASR_MODEL_NAME)
 
 
-def transcribe(audio_path: str) -> str:
+def transcribe_audio(audio_path: str) -> dict:
+    """
+    Transcribes the audio and translates it to English.
+    Returns:
+        {
+            "transcribed_text": "...",
+            "translated_text": "..."
+        }
+    """
     if _asr_pipeline is None:
         initialize_asr()
+
     try:
-        # Enable return_timestamps for long audio
         result = _asr_pipeline(audio_path, return_timestamps=True)
 
-        # Some models return segments instead of plain "text"
+        # Get plain text from segments
         if "text" in result:
-            return result["text"]
+            transcribed_text = result["text"]
         elif "chunks" in result:
-            return " ".join([c.get("text", "") for c in result["chunks"]])
+            transcribed_text = " ".join([c.get("text", "") for c in result["chunks"]])
         else:
-            return str(result)
+            transcribed_text = str(result)
+
+        # Translate to English
+        translated_text = translation_service.translate_to_english(transcribed_text)
+
+        return {
+            "transcribed_text": transcribed_text,
+            "translated_text": translated_text
+        }
+
     except Exception as e:
         print(f"ASR transcription failed: {e}")
-        return ""
+        return {
+            "transcribed_text": "",
+            "translated_text": ""
+        }
